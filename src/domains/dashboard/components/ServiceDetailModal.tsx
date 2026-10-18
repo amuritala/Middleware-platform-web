@@ -20,6 +20,7 @@ interface ServiceDetailModalProps {
   assignedRoles: string[];
   availability: RequestAvailability;
   onSubmit: (requestedRoles: string[]) => Promise<void>;
+  onExplore?: () => void;
   onClose: () => void;
 }
 
@@ -29,6 +30,7 @@ export default function ServiceDetailModal({
   assignedRoles,
   availability,
   onSubmit,
+  onExplore,
   onClose,
 }: ServiceDetailModalProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "access">("overview");
@@ -203,6 +205,17 @@ export default function ServiceDetailModal({
                   JWT Protected
                 </span>
               </div>
+
+              {isAssigned && onExplore && (
+                <button
+                  type="button"
+                  onClick={onExplore}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-700"
+                >
+                  Open API documentation
+                  <span aria-hidden="true">→</span>
+                </button>
+              )}
 
               <div>
                 <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">

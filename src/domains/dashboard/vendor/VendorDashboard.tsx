@@ -1,8 +1,10 @@
+import { Link } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import TopNav from "../components/TopNav";
 import { getDisplayName } from "../../../lib/user";
 import { useServiceCatalog } from "../../../lib/serviceCatalog";
 import { useRoleApplications } from "../../../lib/useRoleApplications";
+import { firstOperationForRole } from "../../../lib/apiCatalog";
 
 export default function VendorDashboard() {
   const displayName = getDisplayName();
@@ -200,9 +202,13 @@ export default function VendorDashboard() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {assigned.map((service) => (
-                  <a
+                  <Link
                     key={service.role}
-                    href="/services"
+                    to={
+                      firstOperationForRole(service.role)
+                        ? `/api-docs?role=${encodeURIComponent(service.role)}`
+                        : "/services"
+                    }
                     className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 hover:bg-orange-50/40 transition-colors"
                   >
                     <code className="px-2 py-1 bg-white text-gray-500 text-[10px] font-mono rounded border border-gray-100 flex-shrink-0">
@@ -211,7 +217,10 @@ export default function VendorDashboard() {
                     <span className="text-sm font-medium text-gray-800 truncate">
                       {service.displayName}
                     </span>
-                  </a>
+                    <span className="ml-auto text-xs font-medium text-orange-600">
+                      API →
+                    </span>
+                  </Link>
                 ))}
               </div>
             ))}
@@ -220,7 +229,7 @@ export default function VendorDashboard() {
         <footer className="mt-8 pt-6 border-t border-gray-200 flex items-center justify-between text-xs text-gray-400">
           <p>Sky Bank Sierra Leone Limited · Authorized by Bank of Sierra Leone</p>
           <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-gray-600">API Documentation</a>
+            <Link to="/api-docs" className="hover:text-gray-600">API Documentation</Link>
             <a href="#" className="hover:text-gray-600">Developer Sandbox</a>
             <a href="#" className="hover:text-gray-600">Security & Compliance</a>
           </div>

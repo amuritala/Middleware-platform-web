@@ -24,7 +24,14 @@ function staticResults(isAdmin: boolean): SearchResult[] {
     { label: "Services", hint: "Browse & request platform services", to: "/services" },
     { label: "Settings", hint: "Password & account security", to: "/settings" },
   ];
-  if (!isAdmin) return common;
+  if (!isAdmin) {
+    common.push({
+      label: "API Explorer",
+      hint: "Endpoint docs and interactive requests",
+      to: "/api-docs",
+    });
+    return common;
+  }
   return [
     ...common,
     { label: "Register Client", hint: "Onboard a new company", to: "/admin/register" },

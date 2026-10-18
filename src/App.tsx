@@ -7,6 +7,7 @@ import ForcePasswordChangePage from './domains/auth/ForcePasswordChangePage';
 import AdminDashboard from './domains/dashboard/admin/AdminDashboard';
 import VendorDashboard from './domains/dashboard/vendor/VendorDashboard';
 import ServicesPage from './domains/dashboard/components/ServicesPage';
+import ApiExplorerPage from './domains/dashboard/components/ApiExplorerPage';
 import ClientsPage from './domains/dashboard/admin/ClientsPage';
 import RegisterClientPage from './domains/dashboard/admin/RegisterClientPage';
 import UsersPage from './domains/dashboard/admin/UsersPage';
@@ -121,6 +122,14 @@ function App() {
                 }
             />
             <Route path="/services" element={<ServicesPage />} />
+            <Route
+                path="/api-docs"
+                element={
+                    <ProtectedRoute requiredRole="vendor" userRole={userRole}>
+                        <ApiExplorerPage />
+                    </ProtectedRoute>
+                }
+            />
 
             {/* Settings is available to both portals and reads the role live from the token. */}
             <Route

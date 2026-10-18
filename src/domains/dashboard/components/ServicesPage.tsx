@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../lib/useAuth";
 import ServiceDetailModal, {
   type RequestAvailability,
@@ -17,6 +17,7 @@ import {
   type ServiceInfo,
 } from "../../../lib/serviceCatalog";
 import type { RoleChangeApplicationResponse } from "../../../lib/types";
+import { firstOperationForRole } from "../../../lib/apiCatalog";
 
 /* ─── Component ─────────────────────────────────────────────────── */
 
@@ -39,6 +40,7 @@ const HEADER_ICONS = {
 
 export default function ServicesPage() {
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [viewingRole, setViewingRole] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("All");
@@ -692,6 +694,14 @@ export default function ServicesPage() {
           assignedRoles={userRoles}
           availability={availabilityFor(viewingRole)}
           onSubmit={submit}
+          onExplore={
+            userRoleSet.has(viewingRole) && firstOperationForRole(viewingRole)
+              ? () =>
+                  navigate(
+                    `/api-docs?role=${encodeURIComponent(viewingRole)}`,
+                  )
+              : undefined
+          }
           onClose={() => setViewingRole(null)}
         />
       )}
