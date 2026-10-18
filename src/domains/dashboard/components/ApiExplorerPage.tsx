@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import TopNav from "./TopNav";
 import { apiCatalog, operationsForRole, type ApiDefinition } from "../../../lib/apiCatalog";
-import { getAccessToken } from "../../../lib/auth";
+import { getValidAccessToken } from "../../../lib/auth";
 import { useAuth } from "../../../lib/useAuth";
 
 interface ExecutionResult {
@@ -78,7 +78,7 @@ export default function ApiExplorerPage() {
 
   const execute = async () => {
     if (!selectedOperation) return;
-    const token = getAccessToken();
+    const token = await getValidAccessToken();
     if (!token) {
       setRequestError("Your sign-in has expired. Sign in again to test this API.");
       return;

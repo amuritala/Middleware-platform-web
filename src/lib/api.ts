@@ -1,4 +1,4 @@
-import { getAccessToken } from "./auth";
+import { getValidAccessToken } from "./auth";
 import type {
   ClientResponse,
   AvailabilityResponse,
@@ -46,7 +46,7 @@ export class ApiError extends Error {
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 async function authHeaders(): Promise<HeadersInit> {
-  const token = getAccessToken();
+  const token = await getValidAccessToken();
   if (token) return { Authorization: `Bearer ${token}` };
   return {};
 }

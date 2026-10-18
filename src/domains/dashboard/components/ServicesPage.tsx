@@ -1234,11 +1234,8 @@ function AssignedServicesTable({
                         </svg>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="whitespace-normal break-words text-sm font-medium text-gray-900">
                           {service.displayName}
-                        </p>
-                        <p className="text-[11px] text-gray-400 font-mono truncate">
-                          {service.role}
                         </p>
                       </div>
                     </div>

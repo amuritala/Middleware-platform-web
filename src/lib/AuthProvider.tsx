@@ -8,12 +8,16 @@ import {
 import { AuthContext } from "./authContext";
 import { accountApi } from "./api";
 import {
-  clearAccessToken,
   getAccessToken,
+  getRefreshToken,
   isAccessTokenValid,
   loginWithCredentials,
+  onTokenChange,
   parseAccessToken,
-  storeAccessToken,
+  refreshAccessToken,
+  revokeSession,
+  REFRESH_LEEWAY_MS,
+  storeTokens,
 } from "./auth";
 
 function loadSavedToken(): string | null {
@@ -45,15 +49,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    clearAccessToken();
+    void revokeSession();
     setAccessToken(null);
     setMustChangePassword(false);
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
-    const token = await loginWithCredentials(username, password);
-    storeAccessToken(token);
-    setAccessToken(token);
+    const tokens = await loginWithCredentials(username, password);
+    storeTokens(tokens);
+    setAccessToken(tokens.accessToken);
   }, []);
 
   // Refresh the flag whenever the signed-in user changes. The fetch lives in the effect
@@ -75,12 +79,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [accessToken]);
 
+  // Keep state in step with refreshes triggered elsewhere (API calls) or a rejected refresh.
+  useEffect(
+    () =>
+      onTokenChange((token) => {
+        setAccessToken(token);
+        if (!token) setMustChangePassword(false);
+      }),
+    [],
+  );
+
+  // After a reload the access token may have expired while the refresh token is still good.
+  useEffect(() => {
+    if (!getAccessToken() && getRefreshToken()) {
+      refreshAccessToken().catch(() => undefined);
+    }
+  }, []);
+
+  // Refresh shortly before expiry; retry while the auth service is unreachable.
   useEffect(() => {
     if (!accessToken) return;
-    const timer = window.setInterval(() => {
-      if (!isAccessTokenValid(accessToken)) logout();
-    }, 30_000);
-    return () => window.clearInterval(timer);
+    const expiresAt = (parseAccessToken(accessToken)?.exp ?? 0) * 1000;
+    let timer: number;
+    const schedule = (delay: number) => {
+      timer = window.setTimeout(async () => {
+        try {
+          const token = await refreshAccessToken();
+          if (!token) logout();
+        } catch {
+          if (Date.now() >= expiresAt) logout();
+          else schedule(15_000);
+        }
+      }, delay);
+    };
+    schedule(Math.max(expiresAt - Date.now() - REFRESH_LEEWAY_MS, 0));
+    return () => window.clearTimeout(timer);
   }, [accessToken, logout]);
 
   const value = useMemo(() => {

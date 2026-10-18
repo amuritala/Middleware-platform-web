@@ -15,7 +15,13 @@ export interface LoginResponse {
 }
 
 const ACCESS_TOKEN_KEY = "skybank_access_token";
-const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || "/consolidated/api";
+const REFRESH_TOKEN_KEY = "skybank_refresh_token";
+/** Refresh this long before the access token expires. */
+export const REFRESH_LEEWAY_MS = 60_000;
+const AUTH_API_URL =
+  import.meta.env.VITE_AUTH_API_URL ||
+  import.meta.env.VITE_API_SERVICE ||
+  "/consolidated/api";
 
 export function parseAccessToken(token: string): TokenClaims | null {
   try {
@@ -68,18 +74,42 @@ export function isAccessTokenValid(token: string): boolean {
 
 export function getAccessToken(): string | null {
   const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
-  if (!token) return null;
-  if (!isAccessTokenValid(token)) {
-    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    return null;
-  }
+  if (!token || !isAccessTokenValid(token)) return null;
   return token;
+}
+
+export function getRefreshToken(): string | null {
+  return sessionStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string | null;
+}
+
+function readTokenPair(body: unknown): TokenPair {
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("access_token" in body) ||
+    typeof body.access_token !== "string" ||
+    !isAccessTokenValid(body.access_token)
+  ) {
+    throw new Error("The authentication service returned an invalid access token");
+  }
+  const refreshToken =
+    "refresh_token" in body &&
+    typeof body.refresh_token === "string" &&
+    body.refresh_token
+      ? body.refresh_token
+      : null;
+  return { accessToken: body.access_token, refreshToken };
 }
 
 export async function loginWithCredentials(
   username: string,
   password: string,
-): Promise<string> {
+): Promise<TokenPair> {
   const response = await fetch(`${AUTH_API_URL.replace(/\/$/, "")}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -102,23 +132,111 @@ export async function loginWithCredentials(
     throw new Error(message);
   }
 
-  if (
-    typeof body !== "object" ||
-    body === null ||
-    !("access_token" in body) ||
-    typeof body.access_token !== "string" ||
-    !isAccessTokenValid(body.access_token)
-  ) {
-    throw new Error("The authentication service returned an invalid access token");
-  }
-
-  return body.access_token;
+  return readTokenPair(body);
 }
 
-export function storeAccessToken(token: string): void {
-  sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+export function storeTokens(tokens: TokenPair): void {
+  sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+  if (tokens.refreshToken) {
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+  }
 }
 
 export function clearAccessToken(): void {
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+/**
+ * Revokes the refresh token on the server (ending the Keycloak session), then clears
+ * local tokens. Local tokens are cleared even if the call fails, so the user is always
+ * signed out in this browser.
+ */
+export async function revokeSession(): Promise<void> {
+  const refreshToken = getRefreshToken();
+  clearAccessToken();
+  if (!refreshToken) return;
+  try {
+    await fetch(`${AUTH_API_URL.replace(/\/$/, "")}/auth/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      keepalive: true,
+    });
+  } catch {
+    // Offline or unreachable: the refresh token still expires on its own.
+  }
+}
+
+type TokenListener = (accessToken: string | null) => void;
+const tokenListeners = new Set<TokenListener>();
+
+/** Notified when a refresh stores a new access token, or ends the session (null). */
+export function onTokenChange(listener: TokenListener): () => void {
+  tokenListeners.add(listener);
+  return () => {
+    tokenListeners.delete(listener);
+  };
+}
+
+function notifyTokenChange(accessToken: string | null): void {
+  tokenListeners.forEach((listener) => listener(accessToken));
+}
+
+let refreshInFlight: Promise<string | null> | null = null;
+
+/**
+ * Exchanges the refresh token for a new token pair. Concurrent callers share one
+ * request, since Keycloak rotates refresh tokens and a second use of the old one fails.
+ * Resolves null when the session is over (the server rejected the refresh token, which
+ * also clears the stored tokens); throws when the service is temporarily unreachable,
+ * leaving the session intact so the caller can retry.
+ */
+export function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return Promise.resolve(null);
+
+  refreshInFlight = (async () => {
+    const response = await fetch(
+      `${AUTH_API_URL.replace(/\/$/, "")}/auth/refresh`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      },
+    );
+
+    if (response.status === 400 || response.status === 401) {
+      clearAccessToken();
+      notifyTokenChange(null);
+      return null;
+    }
+    if (!response.ok) {
+      throw new Error("The authentication service is unavailable");
+    }
+
+    const tokens = readTokenPair(await response.json().catch(() => null));
+    storeTokens(tokens);
+    notifyTokenChange(tokens.accessToken);
+    return tokens.accessToken;
+  })().finally(() => {
+    refreshInFlight = null;
+  });
+
+  return refreshInFlight;
+}
+
+/** Returns a token that is valid for at least the refresh leeway, refreshing if needed. */
+export async function getValidAccessToken(): Promise<string | null> {
+  const token = getAccessToken();
+  const expiresAt = token ? (parseAccessToken(token)?.exp ?? 0) * 1000 : 0;
+  if (token && expiresAt - Date.now() > REFRESH_LEEWAY_MS) return token;
+
+  try {
+    return (await refreshAccessToken()) ?? token;
+  } catch {
+    return token;
+  }
 }

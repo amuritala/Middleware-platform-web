@@ -211,13 +211,10 @@ export default function VendorDashboard() {
                     }
                     className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 hover:bg-orange-50/40 transition-colors"
                   >
-                    <code className="px-2 py-1 bg-white text-gray-500 text-[10px] font-mono rounded border border-gray-100 flex-shrink-0">
-                      {service.role}
-                    </code>
-                    <span className="text-sm font-medium text-gray-800 truncate">
+                    <span className="min-w-0 flex-1 whitespace-normal break-words text-sm font-medium text-gray-800">
                       {service.displayName}
                     </span>
-                    <span className="ml-auto text-xs font-medium text-orange-600">
+                    <span className="shrink-0 text-xs font-medium text-orange-600">
                       API →
                     </span>
                   </Link>
