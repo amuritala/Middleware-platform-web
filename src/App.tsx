@@ -9,7 +9,7 @@ import VendorDashboard from './domains/dashboard/vendor/VendorDashboard';
 import ServicesPage from './domains/dashboard/components/ServicesPage';
 import ApiExplorerPage from './domains/dashboard/components/ApiExplorerPage';
 import ClientsPage from './domains/dashboard/admin/ClientsPage';
-import RegisterClientPage from './domains/dashboard/admin/RegisterClientPage';
+import RegisterUsersPage from './domains/dashboard/admin/RegisterUsersPage';
 import UsersPage from './domains/dashboard/admin/UsersPage';
 import RoleRequestsPage from './domains/dashboard/admin/RoleRequestsPage';
 import AuditPage from './domains/dashboard/admin/AuditPage';
@@ -146,7 +146,7 @@ function App() {
                 path="/admin/register"
                 element={
                     <ProtectedRoute requiredRole="admin" userRole={userRole}>
-                        <RegisterClientPage />
+                        <RegisterUsersPage />
                     </ProtectedRoute>
                 }
             />

@@ -2,16 +2,36 @@ import { useCallback, useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 import TopNav from "../components/TopNav";
 import { adminApi, ApiError } from "../../../lib/api";
-import type { AdminUserResponse } from "../../../lib/types";
+import type { AdminUserResponse, UserType } from "../../../lib/types";
 import { describeRoleName } from "../../../lib/serviceCatalog";
 
 type Status = "loading" | "success" | "error";
+
+const USER_TYPE_LABEL: Record<UserType, string> = {
+  BANK_USER: "Bank User",
+  CLIENT: "Client",
+};
+
+function UserTypeBadge({ type }: { type: UserType }) {
+  return (
+    <span
+      className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+        type === "BANK_USER"
+          ? "bg-indigo-50 text-indigo-600"
+          : "bg-sky-50 text-sky-600"
+      }`}
+    >
+      {USER_TYPE_LABEL[type]}
+    </span>
+  );
+}
 
 /** Roles that may never be granted or revoked through this screen. */
 const PROTECTED_ROLES = new Set(["ROLE_ADMIN", "ROLE_CLIENT"]);
 
 export default function UsersPage() {
   const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | UserType>("ALL");
   const [users, setUsers] = useState<AdminUserResponse[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +55,10 @@ export default function UsersPage() {
     return () => clearTimeout(timer);
   }, [query, load]);
 
+  const visibleUsers = users.filter(
+    (u) => typeFilter === "ALL" || u.userType === typeFilter,
+  );
+
   return (
     <div className="min-h-screen bg-gray-100">
       <Sidebar />
@@ -44,9 +68,9 @@ export default function UsersPage() {
 
         <div className="mb-6 mt-20 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Users</h1>
+            <h1 className="text-3xl font-bold text-gray-900">All Users</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Search Keycloak accounts and grant or revoke their service roles
+              Clients and bank users - search accounts and grant or revoke service roles
             </p>
           </div>
 
@@ -78,9 +102,24 @@ export default function UsersPage() {
             <h2 className="text-sm font-semibold text-gray-900">
               {query ? `Results for “${query}”` : "All users"}
             </h2>
-            <span className="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full">
-              {status === "success" ? users.length : "—"}
-            </span>
+            <div className="flex items-center gap-2">
+              {(["ALL", "CLIENT", "BANK_USER"] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setTypeFilter(f)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
+                    typeFilter === f
+                      ? "bg-gray-900 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {f === "ALL" ? "All" : `${USER_TYPE_LABEL[f]}s`}
+                </button>
+              ))}
+              <span className="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full">
+                {status === "success" ? visibleUsers.length : "—"}
+              </span>
+            </div>
           </div>
 
           {status === "loading" && (
@@ -103,18 +142,19 @@ export default function UsersPage() {
             </div>
           )}
 
-          {status === "success" && users.length === 0 && (
+          {status === "success" && visibleUsers.length === 0 && (
             <div className="py-12 text-center text-sm text-gray-400">
               No users match that search.
             </div>
           )}
 
-          {status === "success" && users.length > 0 && (
+          {status === "success" && visibleUsers.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-xs text-gray-400 border-b border-gray-100">
                     <th className="py-3 pr-4 font-medium">User</th>
+                    <th className="py-3 pr-4 font-medium">Type</th>
                     <th className="py-3 pr-4 font-medium">Email</th>
                     <th className="py-3 pr-4 font-medium">Status</th>
                     <th className="py-3 pr-4 font-medium">Roles</th>
@@ -122,7 +162,7 @@ export default function UsersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((user) => (
+                  {visibleUsers.map((user) => (
                     <tr
                       key={user.keycloakUserId}
                       className="border-b border-gray-50 last:border-0 hover:bg-gray-50/70 transition-colors"
@@ -143,6 +183,9 @@ export default function UsersPage() {
                             </p>
                           </div>
                         </div>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <UserTypeBadge type={user.userType} />
                       </td>
                       <td className="py-3 pr-4 text-sm text-gray-600">
                         {user.email}
@@ -399,6 +442,9 @@ function UserDetailModal({
                       : user.username}
                   </p>
                   <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                  <div className="mt-1.5">
+                    <UserTypeBadge type={user.userType} />
+                  </div>
                 </div>
               </div>
 

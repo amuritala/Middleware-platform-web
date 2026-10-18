@@ -127,7 +127,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
+        {/* <p className="mt-6 text-center text-sm text-gray-500">
           Don&apos;t have an account?{" "}
           <Link
             to="/register"
@@ -135,7 +135,7 @@ export default function LoginPage() {
           >
             Register your company
           </Link>
-        </p>
+        </p> */}
       </div>
     </div>
   );

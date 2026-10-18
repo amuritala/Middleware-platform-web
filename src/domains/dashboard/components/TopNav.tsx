@@ -34,10 +34,10 @@ function staticResults(isAdmin: boolean): SearchResult[] {
   }
   return [
     ...common,
-    { label: "Register Client", hint: "Onboard a new company", to: "/admin/register" },
+    { label: "Register Users", hint: "Onboard a client or add a bank user", to: "/admin/register" },
     { label: "Clients", hint: "Company registrations & lifecycle", to: "/admin/clients" },
     { label: "Role Requests", hint: "Approve or decline service access", to: "/admin/role-requests" },
-    { label: "Users", hint: "Keycloak accounts & roles", to: "/admin/users" },
+    { label: "All Users", hint: "Clients & bank users, accounts & roles", to: "/admin/users" },
     { label: "Audit Log", hint: "Downstream DB traffic", to: "/admin/audit" },
   ];
 }
@@ -52,7 +52,7 @@ export default function TopNav({ portal = "vendor" }: TopNavProps) {
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [users, setUsers] = useState<{ username: string; email: string }[]>([]);
+  const [users, setUsers] = useState<{ username: string; email: string; userType: string }[]>([]);
   const [roleRequests, setRoleRequests] = useState<
     { username: string; id: string }[]
   >([]);
@@ -69,7 +69,7 @@ export default function TopNav({ portal = "vendor" }: TopNavProps) {
     adminApi
       .getUsers()
       .then((u) =>
-        setUsers(u.map((x) => ({ username: x.username, email: x.email }))),
+        setUsers(u.map((x) => ({ username: x.username, email: x.email, userType: x.userType }))),
       )
       .catch(() => undefined);
     adminApi
@@ -147,7 +147,7 @@ export default function TopNav({ portal = "vendor" }: TopNavProps) {
           u.username.toLowerCase().includes(needle) ||
           u.email.toLowerCase().includes(needle)
         ) {
-          out.push({ label: u.username, hint: `User · ${u.email}`, to: "/admin/users" });
+          out.push({ label: u.username, hint: `${u.userType === "BANK_USER" ? "Bank User" : "Client User"} · ${u.email}`, to: "/admin/users" });
         }
         if (out.length >= 10) return out;
       }

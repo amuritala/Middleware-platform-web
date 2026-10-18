@@ -19,9 +19,7 @@ const REFRESH_TOKEN_KEY = "skybank_refresh_token";
 /** Refresh this long before the access token expires. */
 export const REFRESH_LEEWAY_MS = 60_000;
 const AUTH_API_URL =
-  import.meta.env.VITE_AUTH_API_URL ||
-  import.meta.env.VITE_API_SERVICE ||
-  "/consolidated/api";
+  import.meta.env.VITE_AUTH_API_URL || import.meta.env.VITE_API_URL || "/api";
 
 export function parseAccessToken(token: string): TokenClaims | null {
   try {

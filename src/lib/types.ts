@@ -71,6 +71,19 @@ export interface AdminUserResponse {
   enabled: boolean;
   emailVerified: boolean;
   roles: string[];
+  /** BANK_USER = staff holding ROLE_ADMIN; CLIENT = vendor user. */
+  userType: UserType;
+}
+
+export type UserType = "BANK_USER" | "CLIENT";
+
+/** Payload for `POST /api/admin/users` - creates a bank user with ROLE_ADMIN. */
+export interface CreateBankUserRequest {
+  email: string;
+  firstName: string;
+  lastName: string;
+  /** Temporary credential - replaced at first sign-in. */
+  password: string;
 }
 
 /** Mutable user attributes. Omitted fields are left unchanged. */

@@ -12,6 +12,7 @@ import type {
   ChangePasswordRequest,
   CredentialsResponse,
   CreateClientRequest,
+  CreateBankUserRequest,
 } from "./types";
 
 export type {
@@ -122,6 +123,13 @@ export const adminApi = {
    */
   createClient: (body: CreateClientRequest) =>
     request<ClientResponse>("/admin/clients", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  /** Create a bank user (ROLE_ADMIN) with a temporary password emailed to them. */
+  createBankUser: (body: CreateBankUserRequest) =>
+    request<AdminUserResponse>("/admin/users", {
       method: "POST",
       body: JSON.stringify(body),
     }),
