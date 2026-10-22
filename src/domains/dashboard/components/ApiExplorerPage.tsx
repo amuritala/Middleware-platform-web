@@ -158,7 +158,7 @@ export default function ApiExplorerPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopNav portal="vendor" />
+      <TopNav portal={currentRoles.has("ROLE_ADMIN") ? "admin" : "vendor"} />
       <Sidebar />
       <main className="ml-20 px-6 pb-10 pt-24">
         <div className="mb-6">

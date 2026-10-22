@@ -24,16 +24,10 @@ function staticResults(isAdmin: boolean): SearchResult[] {
     { label: "Services", hint: "Browse & request platform services", to: "/services" },
     { label: "Settings", hint: "Password & account security", to: "/settings" },
   ];
-  if (!isAdmin) {
-    common.push({
-      label: "API Explorer",
-      hint: "Endpoint docs and interactive requests",
-      to: "/api-docs",
-    });
-    return common;
-  }
+  if (!isAdmin) return common;
   return [
     ...common,
+    { label: "API Explorer", hint: "Endpoint docs and interactive requests", to: "/api-docs" },
     { label: "Register Users", hint: "Onboard a client or add a bank user", to: "/admin/register" },
     { label: "Clients", hint: "Company registrations & lifecycle", to: "/admin/clients" },
     { label: "Role Requests", hint: "Approve or decline service access", to: "/admin/role-requests" },

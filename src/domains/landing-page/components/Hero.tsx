@@ -8,10 +8,6 @@ export default function Hero() {
     navigate('/login');
   };
 
-  const handleRegister = () => {
-    navigate('/register');
-  };
-
   return (
     <section className="flex flex-col lg:flex-row items-center gap-12 px-14 py-16">
       <div className="flex-1 space-y-6">
@@ -37,12 +33,6 @@ export default function Hero() {
         </p>
 
         <div className="flex items-center gap-4 pt-2">
-          <button
-            onClick={handleRegister}
-            className="px-6 py-3 bg-[#ff6600] text-white text-sm font-medium rounded-full hover:bg-orange-600 transition-colors"
-          >
-            Register your company
-          </button>
           <button
             onClick={handleLogin}
             className="px-6 py-3 bg-gray-900 text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors"

@@ -125,7 +125,7 @@ function App() {
             <Route
                 path="/api-docs"
                 element={
-                    <ProtectedRoute requiredRole="vendor" userRole={userRole}>
+                    <ProtectedRoute requiredRole={userRole ?? ''} userRole={userRole}>
                         <ApiExplorerPage />
                     </ProtectedRoute>
                 }

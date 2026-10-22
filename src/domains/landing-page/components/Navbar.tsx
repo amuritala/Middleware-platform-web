@@ -10,10 +10,6 @@ export default function Navbar() {
     navigate('/login');
   };
 
-  const handleRegister = () => {
-    navigate('/register');
-  };
-
   return (
     <nav className="flex items-center justify-between px-14 py-4">
       <Link to="/">
@@ -41,12 +37,6 @@ export default function Navbar() {
           className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
         >
           Login
-        </button>
-        <button
-          onClick={handleRegister}
-          className="px-5 py-2.5 bg-orange-500 text-white text-sm font-medium rounded-full hover:bg-orange-600 transition-colors"
-        >
-          Register
         </button>
       </div>
     </nav>
