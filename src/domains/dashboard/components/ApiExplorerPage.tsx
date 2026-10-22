@@ -6,21 +6,24 @@ import { apiCatalog, operationsForRole, type ApiDefinition } from "../../../lib/
 import { getValidAccessToken } from "../../../lib/auth";
 import { useAuth } from "../../../lib/useAuth";
 
+const API_SERVICE_BASE_URL =
+  import.meta.env.VITE_API_SERVICE?.trim() ||
+  (typeof window === "undefined"
+    ? "/consolidated/api"
+    : `${window.location.protocol}//${window.location.hostname}:8082/api`);
+
 interface ExecutionResult {
   status: number;
   durationMs: number;
   body: unknown;
 }
 
-const API_SERVICE_URL =
-  import.meta.env.VITE_API_SERVICE || "/consolidated/api";
-
 function formatJson(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
 function requestUrl(operation: ApiDefinition): string {
-  const baseUrl = API_SERVICE_URL.replace(/\/+$/, "");
+  const baseUrl = API_SERVICE_BASE_URL.replace(/\/+$/, "");
   const path =
     baseUrl.endsWith("/api") && operation.path.startsWith("/api/")
       ? operation.path.slice(4)

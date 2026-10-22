@@ -1,4 +1,5 @@
 import { getValidAccessToken } from "./auth";
+import { API_BASE_URL } from "./apiBaseUrl";
 import type {
   ClientResponse,
   AvailabilityResponse,
@@ -44,8 +45,6 @@ export class ApiError extends Error {
   }
 }
 
-const API_URL = import.meta.env.VITE_API_URL || "/api";
-
 async function authHeaders(): Promise<HeadersInit> {
   const token = await getValidAccessToken();
   if (token) return { Authorization: `Bearer ${token}` };
@@ -62,7 +61,7 @@ async function request<T>(
     ...(options.headers as HeadersInit | undefined),
   };
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
 
   if (!res.ok) {
     const body = await res.json().catch(() => null);

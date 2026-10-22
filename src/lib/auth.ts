@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "./apiBaseUrl";
+
 export interface TokenClaims {
   exp?: number;
   email?: string;
@@ -19,7 +21,7 @@ const REFRESH_TOKEN_KEY = "skybank_refresh_token";
 /** Refresh this long before the access token expires. */
 export const REFRESH_LEEWAY_MS = 60_000;
 const AUTH_API_URL =
-  import.meta.env.VITE_AUTH_API_URL || import.meta.env.VITE_API_URL || "/api";
+  import.meta.env.VITE_AUTH_API_URL?.trim() || API_BASE_URL;
 
 export function parseAccessToken(token: string): TokenClaims | null {
   try {
@@ -238,3 +240,4 @@ export async function getValidAccessToken(): Promise<string | null> {
     return token;
   }
 }
+import { API_BASE_URL } from "./apiBaseUrl";

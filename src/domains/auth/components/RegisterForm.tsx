@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { adminApi, publicApi, ApiError } from "../../../lib/api";
+import { API_BASE_URL } from "../../../lib/apiBaseUrl";
 
 /* ------------------------------------------------------------------ */
 /* Small shared field primitives                                       */
@@ -362,7 +363,7 @@ export default function RegisterForm({
       }
 
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || "/api"}/register`,
+        `${API_BASE_URL}/register`,
         {
           companyName: step1.companyName,
           contactEmail: step2.contactEmail || step1.companyEmail,
