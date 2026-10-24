@@ -26,12 +26,15 @@ function formatDate(dateStr: string | null) {
 interface ClientDetailModalProps {
   clientId: string;
   onClose: () => void;
-  onApprove: (clientId: string, roles: string[]) => Promise<void>;
-  onReject: (clientId: string) => Promise<void>;
-  /** Suspend an approved / active client. Omit where the caller cannot suspend. */
-  onSuspend?: (clientId: string) => Promise<void>;
-  /** Reactivate a suspended or rejected client. */
-  onActivate?: (clientId: string, roles: string[]) => Promise<void>;
+  /** Omit when the caller's role may not decide self-registration reviews. */
+  onApprove?: (clientId: string, roles: string[]) => Promise<void>;
+  onReject?: (clientId: string) => Promise<void>;
+  /** Propose suspension (maker-checker - the comment travels with the request). */
+  onSuspend?: (clientId: string, comment: string) => Promise<void>;
+  /** Propose reactivation (maker-checker). */
+  onActivate?: (clientId: string, roles: string[], comment: string) => Promise<void>;
+  /** The client sits in the approvals queue - its decision belongs there, not here. */
+  awaitingQueue?: boolean;
 }
 
 export default function ClientDetailModal({
@@ -41,6 +44,7 @@ export default function ClientDetailModal({
   onReject,
   onSuspend,
   onActivate,
+  awaitingQueue,
 }: ClientDetailModalProps) {
   const [client, setClient] = useState<ClientResponse | null>(null);
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
@@ -53,6 +57,9 @@ export default function ClientDetailModal({
   const [acting, setActing] = useState(false);
   /** Review mode unlocks the approve/reject footer; closed cards only offer Review. */
   const [reviewing, setReviewing] = useState(false);
+  /** Lifecycle actions demand a written comment before they are proposed. */
+  const [pendingAction, setPendingAction] = useState<"suspend" | "activate" | null>(null);
+  const [lifecycleComment, setLifecycleComment] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -139,9 +146,19 @@ export default function ClientDetailModal({
     }
   };
 
-  const canDecide = client?.status === "PENDING";
+  const canDecide =
+    client?.status === "PENDING" && !awaitingQueue && !!onApprove && !!onReject;
   const showDecisionButtons = reviewing && canDecide;
   const rolesSelected = selectedRoles.length > 0;
+
+  const confirmLifecycle = () => {
+    if (!client || !lifecycleComment.trim()) return;
+    if (pendingAction === "suspend") {
+      void run(() => onSuspend!(client.id, lifecycleComment.trim()));
+    } else if (pendingAction === "activate") {
+      void run(() => onActivate!(client.id, selectedRoles, lifecycleComment.trim()));
+    }
+  };
 
   return (
     <div
@@ -420,6 +437,38 @@ export default function ClientDetailModal({
           )}
         </div>
 
+        {/* Mandatory comment before proposing a lifecycle change */}
+        {client && pendingAction && (
+          <div className="p-4 border-t border-amber-100 bg-amber-50/70 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+            <textarea
+              rows={2}
+              value={lifecycleComment}
+              onChange={(e) => setLifecycleComment(e.target.value)}
+              placeholder={`Why ${pendingAction === "suspend" ? "suspend" : "reactivate"} this vendor? Required - an authorizer reviews it.`}
+              className="flex-1 px-3.5 py-2.5 bg-white border border-amber-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-colors resize-none"
+            />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => {
+                  setPendingAction(null);
+                  setLifecycleComment("");
+                }}
+                disabled={acting}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmLifecycle}
+                disabled={acting || !lifecycleComment.trim()}
+                className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl shadow-md shadow-amber-500/25 hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {acting ? "Submitting…" : "Submit for approval"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Footer - Closed card shows Review; review mode shows Approve / Reject / Close */}
         {client && (
           <div className="flex flex-wrap items-center justify-end gap-3 p-6 border-t border-gray-100 sticky bottom-0 bg-white">
@@ -451,14 +500,14 @@ export default function ClientDetailModal({
                   Back
                 </button>
                 <button
-                  onClick={() => void run(() => onReject(client.id))}
+                  onClick={() => void run(() => onReject!(client.id))}
                   disabled={acting}
                   className="px-5 py-2.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors disabled:opacity-50"
                 >
                   {acting ? "Processing…" : "Reject"}
                 </button>
                 <button
-                  onClick={() => void run(() => onApprove(client.id, selectedRoles))}
+                  onClick={() => void run(() => onApprove!(client.id, selectedRoles))}
                   disabled={acting || !rolesSelected}
                   title={
                     rolesSelected
@@ -473,6 +522,15 @@ export default function ClientDetailModal({
             ) : (
               /* Non-pending lifecycle actions */
               <>
+                {client.status === "PENDING" && awaitingQueue && (
+                  <p className="mr-auto text-xs font-medium text-amber-600 flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Awaiting authorization - decide it in User Management → Approvals
+                  </p>
+                )}
+
                 <button
                   onClick={onClose}
                   className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
@@ -483,8 +541,11 @@ export default function ClientDetailModal({
                 {(client.status === "APPROVED" || client.status === "ACTIVE") &&
                   onSuspend && (
                     <button
-                      onClick={() => void run(() => onSuspend(client.id))}
-                      disabled={acting}
+                      onClick={() => {
+                        setPendingAction("suspend");
+                        setLifecycleComment("");
+                      }}
+                      disabled={acting || pendingAction !== null}
                       className="px-5 py-2.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 transition-colors disabled:opacity-50"
                     >
                       {acting ? "Processing…" : "Suspend"}
@@ -494,8 +555,11 @@ export default function ClientDetailModal({
                 {(client.status === "SUSPENDED" || client.status === "REJECTED") &&
                   onActivate && (
                     <button
-                      onClick={() => void run(() => onActivate(client.id, selectedRoles))}
-                      disabled={acting}
+                      onClick={() => {
+                        setPendingAction("activate");
+                        setLifecycleComment("");
+                      }}
+                      disabled={acting || pendingAction !== null}
                       className="px-5 py-2.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors disabled:opacity-50"
                     >
                       {acting

@@ -291,21 +291,9 @@ export default function ServicesPage() {
           {/* Summary pills */}
           <div className="flex flex-wrap items-center gap-3 mt-5">
             <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-gray-100 shadow-sm">
-              <div className="w-2 h-2 rounded-full bg-orange-500" />
-              <span className="text-sm font-medium text-gray-700">
-                {catalog.length} Services
-              </span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-gray-100 shadow-sm">
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
               <span className="text-sm font-medium text-gray-700">
                 {assignedCount} Assigned
-              </span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-gray-100 shadow-sm">
-              <div className="w-2 h-2 rounded-full bg-gray-300" />
-              <span className="text-sm font-medium text-gray-700">
-                {catalog.length - assignedCount} Available to Request
               </span>
             </div>
             {pending && (

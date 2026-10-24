@@ -20,8 +20,7 @@ const ACCESS_TOKEN_KEY = "skybank_access_token";
 const REFRESH_TOKEN_KEY = "skybank_refresh_token";
 /** Refresh this long before the access token expires. */
 export const REFRESH_LEEWAY_MS = 60_000;
-const AUTH_API_URL =
-  import.meta.env.VITE_AUTH_API_URL?.trim() || API_BASE_URL;
+const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL?.trim() || API_BASE_URL;
 
 export function parseAccessToken(token: string): TokenClaims | null {
   try {
@@ -95,7 +94,9 @@ function readTokenPair(body: unknown): TokenPair {
     typeof body.access_token !== "string" ||
     !isAccessTokenValid(body.access_token)
   ) {
-    throw new Error("The authentication service returned an invalid access token");
+    throw new Error(
+      "The authentication service returned an invalid access token",
+    );
   }
   const refreshToken =
     "refresh_token" in body &&
@@ -110,11 +111,14 @@ export async function loginWithCredentials(
   username: string,
   password: string,
 ): Promise<TokenPair> {
-  const response = await fetch(`${AUTH_API_URL.replace(/\/$/, "")}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
+  const response = await fetch(
+    `${AUTH_API_URL.replace(/\/$/, "")}/auth/login`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    },
+  );
 
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -240,4 +244,3 @@ export async function getValidAccessToken(): Promise<string | null> {
     return token;
   }
 }
-import { API_BASE_URL } from "./apiBaseUrl";

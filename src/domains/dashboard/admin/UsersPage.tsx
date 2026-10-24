@@ -320,6 +320,9 @@ function UserDetailModal({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  const [roleComment, setRoleComment] = useState("");
+  const [submitted, setSubmitted] = useState<string | null>(null);
+
   const run = async (action: () => Promise<AdminUserResponse>) => {
     setBusy(true);
     setError(null);
@@ -360,18 +363,27 @@ function UserDetailModal({
 
   const applyRoleChanges = async () => {
     if (!user || !hasChanges) return;
+    const comment = roleComment.trim();
+    if (!comment) {
+      setError("A comment is required - service changes go through authorization.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      let updated = user;
+      // Each set of changes becomes a maker-checker request: nothing applies until
+      // an authorizer signs it off, so the local user object stays as it is.
       if (revoke.length > 0) {
-        updated = await adminApi.unassignRoles(user.keycloakUserId, revoke);
+        await adminApi.unassignRoles(user.keycloakUserId, revoke, comment);
       }
       if (grant.length > 0) {
-        updated = await adminApi.assignRoles(user.keycloakUserId, grant);
+        await adminApi.assignRoles(user.keycloakUserId, grant, comment);
       }
-      setUser(updated);
-      onChanged(updated);
+      setSubmitted(
+        `Submitted for authorization: ${grant.length} to grant, ${revoke.length} to revoke. ` +
+          "An authorizer must approve before anything changes.",
+      );
+      setRoleComment("");
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -625,8 +637,32 @@ function UserDetailModal({
           )}
         </div>
 
-        {/* Footer with the single Apply action */}
-        <div className="flex items-center justify-between gap-3 p-6 border-t border-gray-100">
+        {/* Footer: mandatory comment, then the single Apply action */}
+        <div className="p-6 border-t border-gray-100 space-y-3">
+          {submitted ? (
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 px-3.5 py-3">
+              <svg className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-amber-700 leading-relaxed">{submitted}</p>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5" htmlFor="role-comment">
+                Comment <span className="text-orange-500">•</span> required
+              </label>
+              <textarea
+                id="role-comment"
+                value={roleComment}
+                onChange={(e) => setRoleComment(e.target.value)}
+                rows={2}
+                disabled={busy}
+                placeholder="Why are these services being changed?"
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent focus:bg-white transition-colors resize-none"
+              />
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-3">
           <div className="text-xs text-gray-500 min-w-0">
             {error ? (
               <span className="text-red-500">{error}</span>
@@ -654,9 +690,10 @@ function UserDetailModal({
             >
               Close
             </button>
+            {!submitted && (
             <button
               onClick={() => void applyRoleChanges()}
-              disabled={busy || !hasChanges}
+              disabled={busy || !hasChanges || !roleComment.trim()}
               className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none flex items-center gap-2"
             >
               {busy && (
@@ -676,8 +713,10 @@ function UserDetailModal({
                   />
                 </svg>
               )}
-              {busy ? "Applying…" : "Apply Changes"}
+              {busy ? "Submitting…" : "Submit for approval"}
             </button>
+            )}
+          </div>
           </div>
         </div>
       </div>

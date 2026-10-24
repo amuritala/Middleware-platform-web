@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAdminSession } from "../../../lib/adminSession";
 import Sidebar from "../components/Sidebar";
 import TopNav from "../components/TopNav";
 import { adminApi, ApiError } from "../../../lib/api";
@@ -16,6 +17,9 @@ interface Flash {
 const PAGE_SIZE = 8;
 
 export default function RoleRequestsPage() {
+  // Deciding vendor role requests is an authorizer (or Super Admin) power.
+  const { can } = useAdminSession();
+  const mayAuthorize = can("authorize");
   const [applications, setApplications] = useState<
     RoleChangeApplicationResponse[]
   >([]);
@@ -23,6 +27,8 @@ export default function RoleRequestsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
+  /** Services the reviewer crossed off per request - approval grants the rest. */
+  const [removedRoles, setRemovedRoles] = useState<Record<string, string[]>>({});
   const [page, setPage] = useState(1);
   const [prevCount, setPrevCount] = useState(-1);
 
@@ -58,14 +64,50 @@ export default function RoleRequestsPage() {
     void load();
   }, [load]);
 
+  const requestedOf = (application: RoleChangeApplicationResponse) =>
+    application.newlyRequestedRoles?.length
+      ? application.newlyRequestedRoles
+      : application.requestedRoles;
+
+  const removedOf = (applicationId: string) =>
+    removedRoles[applicationId] ?? [];
+
+  /** Everything the reviewer did not cross off - this is what gets granted. */
+  const approvedRolesFor = (application: RoleChangeApplicationResponse) => {
+    const removed = new Set(removedOf(application.id));
+    return application.requestedRoles.filter((role) => !removed.has(role));
+  };
+
+  const toggleService = (
+    application: RoleChangeApplicationResponse,
+    role: string,
+  ) => {
+    setRemovedRoles((prev) => {
+      const current = prev[application.id] ?? [];
+      const next = current.includes(role)
+        ? current.filter((r) => r !== role)
+        : [...current, role];
+      return { ...prev, [application.id]: next };
+    });
+  };
+
   const decide = async (
     application: RoleChangeApplicationResponse,
     action: "approve" | "reject",
   ) => {
     setBusyId(application.id);
+    const removed = removedOf(application.id);
     try {
       if (action === "approve") {
-        await adminApi.approveRoleApplication(application.id);
+        const approved = approvedRolesFor(application);
+        if (approved.length === 0) {
+          setFlash({
+            kind: "error",
+            text: "Every service was removed - reject the request instead of approving an empty one.",
+          });
+          return;
+        }
+        await adminApi.approveRoleApplication(application.id, approved);
       } else {
         await adminApi.rejectRoleApplication(application.id);
       }
@@ -74,7 +116,9 @@ export default function RoleRequestsPage() {
         kind: action === "approve" ? "approved" : "rejected",
         text:
           action === "approve"
-            ? `${application.username}'s roles were applied in Keycloak. They need to sign in again for the new roles to appear in their access token.`
+            ? removed.length > 0
+              ? `${removed.length} service${removed.length === 1 ? " was" : "s were"} left out. ${application.username} received ${approvedRolesFor(application).length} of ${application.requestedRoles.length} requested services and must sign in again for them to appear.`
+              : `${application.username}'s roles were applied in Keycloak. They need to sign in again for the new roles to appear in their access token.`
             : `${application.username}'s request was declined. Their existing roles are unchanged.`,
       });
     } catch (err) {
@@ -318,62 +362,103 @@ export default function RoleRequestsPage() {
                         </td>
                         <td className="px-3 py-3.5">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            {(app.newlyRequestedRoles?.length
-                              ? app.newlyRequestedRoles
-                              : app.requestedRoles
-                            ).map((role) => (
-                              <span
-                                key={role}
-                                title={describeRoleName(role).description}
-                                className="px-2 py-0.5 bg-white border border-orange-200 rounded-lg text-[12.5px] font-mono text-orange-700 font-bold"
-                              >
-                                {describeRoleName(role).displayName}
-                              </span>
-                            ))}
+                            {requestedOf(app).map((role) => {
+                              const removed = removedOf(app.id).includes(role);
+                              const info = describeRoleName(role);
+                              return (
+                                <span
+                                  key={role}
+                                  title={info.description}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[12.5px] font-mono font-bold border transition-colors ${
+                                    removed
+                                      ? "bg-gray-50 border-gray-200 text-gray-400 line-through"
+                                      : "bg-white border-orange-200 text-orange-700"
+                                  }`}
+                                >
+                                  {info.displayName}
+                                  {mayAuthorize && (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleService(app, role)}
+                                      disabled={busyId === app.id}
+                                      aria-label={
+                                        removed
+                                          ? `Restore ${info.displayName}`
+                                          : `Remove ${info.displayName} from this approval`
+                                      }
+                                      title={
+                                        removed
+                                          ? `Add ${info.displayName} back`
+                                          : `Remove ${info.displayName}`
+                                      }
+                                      className={`ml-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border text-[13px] font-bold leading-none transition-colors disabled:opacity-50 ${
+                                        removed
+                                          ? "border-gray-300 bg-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-300"
+                                          : "border-orange-500 bg-orange-500 text-white shadow-sm hover:border-orange-600 hover:bg-orange-600"
+                                      }`}
+                                    >
+                                      {removed ? "+" : "×"}
+                                    </button>
+                                  )}
+                                </span>
+                              );
+                            })}
                           </div>
+                          {mayAuthorize &&
+                            removedOf(app.id).length > 0 && (
+                              <p className="mt-1.5 text-[11px] text-gray-400">
+                                {removedOf(app.id).length} removed - Approve grants the
+                                remaining{" "}
+                                {approvedRolesFor(app).length} of{" "}
+                                {app.requestedRoles.length}
+                              </p>
+                            )}
                         </td>
                         <td className="hidden lg:table-cell px-3 py-3.5">
                           <span className="text-xs text-gray-400">
                             {formatDate(app.createdAt)}
                           </span>
-                        </td>
-                        <td className="pl-3 pr-5 py-3.5">
+                        </td>                        <td className="pl-3 pr-5 py-3.5">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => void decide(app, "reject")}
-                              disabled={busyId === app.id}
-                              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
-                            >
-                              Reject
-                            </button>
-                            <button
-                              onClick={() => void decide(app, "approve")}
-                              disabled={busyId === app.id}
-                              className="px-3 py-1.5 text-xs font-medium text-white bg-orange-500 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                            >
-                              {busyId === app.id && (
-                                <svg
-                                  className="w-3 h-3 animate-spin"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
+                            {mayAuthorize ? (
+                              <>
+                                <button
+                                  onClick={() => void decide(app, "reject")}
+                                  disabled={busyId === app.id}
+                                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
                                 >
-                                  <circle
-                                    className="opacity-25"
-                                    cx="12"
-                                    cy="12"
-                                    r="10"
-                                    stroke="currentColor"
-                                    strokeWidth="4"
-                                  />
-                                  <path
-                                    className="opacity-75"
-                                    fill="currentColor"
-                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                                  />
-                                </svg>
-                              )}
-                              Approve
-                            </button>
+                                  Reject
+                                </button>
+                                <button
+                                  onClick={() => void decide(app, "approve")}
+                                  disabled={
+                                    busyId === app.id ||
+                                    approvedRolesFor(app).length === 0
+                                  }
+                                  title={
+                                    approvedRolesFor(app).length === 0
+                                      ? "All services were removed - reject instead"
+                                      : approvedRolesFor(app).length <
+                                          app.requestedRoles.length
+                                        ? `Approve ${approvedRolesFor(app).length} of ${app.requestedRoles.length} services`
+                                        : undefined
+                                  }
+                                  className="px-3 py-1.5 text-xs font-medium text-white bg-orange-500 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                                >
+                                  {busyId === app.id && (
+                                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                  )}
+                                  Approve
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-[11px] text-gray-400 italic">
+                                Awaiting an authorizer
+                              </span>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -462,9 +547,9 @@ export default function RoleRequestsPage() {
               </div>
 
               <p className="text-[11px] text-gray-400 mt-4 px-1">
-                Showing only the newly requested services. Approving applies the
-                vendor's complete target role set — services they already hold
-                are kept.
+                Showing only the newly requested services. Click the × on a pill to
+                leave that service out - Approve then grants only the pills that
+                remain, and services the vendor already holds are kept either way.
               </p>
             </>
           )}

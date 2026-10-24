@@ -3,12 +3,15 @@ import Sidebar from "../components/Sidebar";
 import TopNav from "../components/TopNav";
 import { adminApi } from "../../../lib/api";
 import type { DownstreamAuditResponse, PageResponse } from "../../../lib/types";
+import GovernanceAuditPanel from "./GovernanceAuditPanel";
 
 type Status = "loading" | "success" | "error";
 
 const PAGE_SIZE = 20;
 
 export default function AuditPage() {
+  // Governance actions (maker-checker) is the primary view; downstream traffic stays.
+  const [view, setView] = useState<"governance" | "downstream">("governance");
   const [page, setPage] = useState(0);
   const [data, setData] =
     useState<PageResponse<DownstreamAuditResponse> | null>(null);
@@ -37,8 +40,8 @@ export default function AuditPage() {
   }, []);
 
   useEffect(() => {
-    void load(page);
-  }, [page, load]);
+    if (view === "downstream") void load(page);
+  }, [page, load, view]);
 
   // Client-side filter over the current page - the endpoint has no server-side search.
   const visibleRows = useMemo(() => {
@@ -67,14 +70,45 @@ export default function AuditPage() {
       <div className="ml-20 p-6">
         <TopNav portal="admin" />
 
-        <div className="mb-6 mt-20">
-          <h1 className="text-3xl font-bold text-gray-900">Downstream DB</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Every call this service made to a downstream system on behalf of a
-            user
-          </p>
+        <div className="mb-6 mt-20 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Audit Log</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {view === "governance"
+                ? "Every initiation, approval and rejection - who acted, in which role, and why"
+                : "Every call this service made to a downstream system on behalf of a user"}
+            </p>
+          </div>
+
+          <div className="inline-flex items-center gap-1 p-1.5 rounded-2xl bg-white border border-gray-200 shadow-sm">
+            {(
+              [
+                { id: "governance", label: "Governance actions" },
+                { id: "downstream", label: "Downstream calls" },
+              ] as const
+            ).map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                onClick={() => {
+                  setView(entry.id);
+                  setPage(0);
+                }}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  view === entry.id
+                    ? "bg-gray-900 text-white shadow-md"
+                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                }`}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
         </div>
 
+        {view === "governance" && <GovernanceAuditPanel />}
+
+        {view === "downstream" && (
         <div className="bg-white rounded-2xl p-6 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-5">
             <div className="flex items-center gap-3">
@@ -324,6 +358,7 @@ export default function AuditPage() {
             </>
           )}
         </div>
+        )}
       </div>
     </div>
   );

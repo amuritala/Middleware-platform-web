@@ -1,9 +1,13 @@
+import type { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../lib/useAuth";
+import { useAdminSession } from "../../../lib/adminSession";
+import { LuUserRoundCog } from "react-icons/lu";
+import { VscGitPullRequestCreate } from "react-icons/vsc";
 
 interface NavItem {
   name: string;
-  icon: string;
+  icon: ReactNode | string;
   to?: string;
   soon?: boolean;
 }
@@ -15,6 +19,7 @@ export default function Sidebar() {
 
   const roles = claims?.realm_access?.roles ?? [];
   const isAdmin = roles.includes("ROLE_ADMIN");
+  const { can } = useAdminSession();
   const homePath = isAdmin ? "/admin-dashboard" : "/vendor-dashboard";
 
   const items: NavItem[] = [
@@ -28,39 +33,54 @@ export default function Sidebar() {
       icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z",
       to: "/services",
     },
-    // Administration - only rendered for administrators.
+    // Administration - rendered only where the caller's governance role grants access.
     ...(isAdmin
       ? [
-          {
-            name: "API Explorer",
-            icon: "M8 9l3 3-3 3m5 0h3M5 4h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z",
-            to: "/api-docs",
-          },
-          {
-            name: "Register Users",
-            icon: "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z",
-            to: "/admin/register",
-          },
-          {
-            name: "Clients",
-            icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
-            to: "/admin/clients",
-          },
-          {
-            name: "Role Requests",
-            icon: "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9",
-            to: "/admin/role-requests",
-          },
-          {
-            name: "All Users",
-            icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
-            to: "/admin/users",
-          },
-          {
-            name: "Audit Log",
-            icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
-            to: "/admin/audit",
-          },
+          ...(can("view.clients")
+            ? [
+                {
+                  name: "Clients",
+                  icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+                  to: "/admin/clients",
+                },
+              ]
+            : []),
+          ...(can("view.role_requests")
+            ? [
+                {
+                  name: "Role Requests",
+                  icon: <VscGitPullRequestCreate size={28} />,
+                  to: "/admin/role-requests",
+                },
+              ]
+            : []),
+          ...(can("initiate.service_assignment")
+            ? [
+                {
+                  name: "Users",
+                  icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
+                  to: "/admin/users",
+                },
+              ]
+            : []),
+          ...(can("view.approvals")
+            ? [
+                {
+                  name: "User Management",
+                  icon: <LuUserRoundCog size={28} />,
+                  to: "/admin/user-management",
+                },
+              ]
+            : []),
+          ...(can("view.audit")
+            ? [
+                {
+                  name: "Audit Log",
+                  icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+                  to: "/admin/audit",
+                },
+              ]
+            : []),
         ]
       : []),
     {
@@ -75,7 +95,8 @@ export default function Sidebar() {
     },
   ];
 
-  const isActive = (item: NavItem) => !!item.to && location.pathname === item.to;
+  const isActive = (item: NavItem) =>
+    !!item.to && location.pathname === item.to;
 
   return (
     <aside className="fixed left-4 top-0 bottom-0 flex flex-col items-center py-6 px-2 w-16 z-50">
@@ -98,19 +119,25 @@ export default function Sidebar() {
                     : "text-gray-400 hover:bg-orange-50 hover:text-orange-500 hover:-translate-y-0.5"
               }`}
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d={item.icon}
-                />
-              </svg>
+              {typeof item.icon === "string" ? (
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d={item.icon}
+                  />
+                </svg>
+              ) : (
+                <span className="flex items-center justify-center w-5 h-5">
+                  {item.icon}
+                </span>
+              )}
 
               {/* Pending badge for sections without a page yet */}
               {item.soon && (

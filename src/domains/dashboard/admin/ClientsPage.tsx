@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 import TopNav from "../components/TopNav";
 import ClientDetailModal from "../components/ClientDetailModal";
-import { adminApi, ApiError, type ClientResponse } from "../../../lib/api";
+import VendorRegistrationModal from "./VendorRegistrationModal";
+import { adminApi, governanceApi, ApiError, type ClientResponse } from "../../../lib/api";
 import { useClients } from "../../../lib/useClients";
+import { useAdminSession } from "../../../lib/adminSession";
 
 type Filter = ClientResponse["status"] | "ALL";
 
@@ -29,6 +31,31 @@ export default function ClientsPage() {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [queuedIds, setQueuedIds] = useState<Set<string>>(new Set());
+
+  const { can } = useAdminSession();
+  const mayPropose = can("initiate.client_suspend") || can("initiate.client_activate");
+
+  // Clients whose decision lives in the approvals queue - their modal stays read-only.
+  const loadQueue = useCallback(async () => {
+    try {
+      const queue = await governanceApi.getApprovals("PENDING");
+      setQueuedIds(
+        new Set(
+          queue
+            .map((request) => request.targetId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+    } catch {
+      // The queue is a hint only - the server refuses out-of-band decisions anyway.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadQueue();
+  }, [loadQueue]);
 
   // The hook loads every client once and filters in memory, so switching tabs is instant.
   const filterArg = filter === "ALL" ? undefined : filter;
@@ -39,6 +66,7 @@ export default function ClientsPage() {
     try {
       await action();
       await refetch();
+      await loadQueue();
     } catch (err) {
       const message =
         err instanceof ApiError
@@ -58,11 +86,11 @@ export default function ClientsPage() {
   const reject = (clientId: string) =>
     run(() => adminApi.rejectClient(clientId));
 
-  const suspend = (clientId: string) =>
-    run(() => adminApi.suspendClient(clientId));
+  const suspend = (clientId: string, comment: string) =>
+    run(() => governanceApi.initiateClientSuspend(clientId, comment));
 
-  const activate = (clientId: string, roles: string[]) =>
-    run(() => adminApi.activateClient(clientId, roles));
+  const activate = (clientId: string, roles: string[], comment: string) =>
+    run(() => governanceApi.initiateClientActivate(clientId, roles, comment));
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -71,12 +99,29 @@ export default function ClientsPage() {
       <div className="ml-20 p-6">
         <TopNav portal="admin" />
 
-        <div className="mb-6 mt-20">
-          <h1 className="text-3xl font-bold text-gray-900">Clients</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Review onboarding applications and manage the lifecycle of every
-            registered company
-          </p>
+        <div className="mb-6 mt-20 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Clients</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Review onboarding applications and manage the lifecycle of every
+              registered company
+            </p>
+          </div>
+
+          {can("initiate.vendor_registration") && (
+            <button
+              type="button"
+              onClick={() => setRegisterOpen(true)}
+              className="group inline-flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-bold shadow-lg shadow-orange-500/25 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all"
+            >
+              <span className="w-6 h-6 rounded-lg bg-white/20 group-hover:bg-white/30 flex items-center justify-center transition-colors">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+              </span>
+              Register vendor
+            </button>
+          )}
         </div>
 
         {actionError && (
@@ -350,10 +395,21 @@ export default function ClientsPage() {
         <ClientDetailModal
           clientId={selectedId}
           onClose={() => setSelectedId(null)}
-          onApprove={approve}
-          onReject={reject}
-          onSuspend={suspend}
-          onActivate={activate}
+          onApprove={can("authorize") && !queuedIds.has(selectedId) ? approve : undefined}
+          onReject={can("authorize") && !queuedIds.has(selectedId) ? reject : undefined}
+          awaitingQueue={queuedIds.has(selectedId)}
+          onSuspend={mayPropose && can("initiate.client_suspend") ? suspend : undefined}
+          onActivate={mayPropose && can("initiate.client_activate") ? activate : undefined}
+        />
+      )}
+
+      {registerOpen && (
+        <VendorRegistrationModal
+          onClose={() => setRegisterOpen(false)}
+          onSubmitted={() => {
+            void refetch();
+            void loadQueue();
+          }}
         />
       )}
     </div>

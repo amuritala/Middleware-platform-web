@@ -5,13 +5,16 @@ import { BrowserRouter } from 'react-router-dom';
 import './index.css';
 import App from './App.tsx';
 import { AuthProvider } from './lib/AuthProvider';
+import { AdminSessionProvider } from './lib/adminSession';
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <AuthProvider>
-            <BrowserRouter>
-                <App />
-            </BrowserRouter>
+            <AdminSessionProvider>
+                <BrowserRouter>
+                    <App />
+                </BrowserRouter>
+            </AdminSessionProvider>
         </AuthProvider>
     </StrictMode>
 );

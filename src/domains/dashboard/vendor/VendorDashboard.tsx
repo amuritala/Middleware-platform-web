@@ -67,10 +67,10 @@ export default function VendorDashboard() {
               {catalogStatus === "success" ? assigned.length : "—"}
             </span>
             <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100">
-              <span className="text-xs text-gray-400">
-                of {catalogStatus === "success" ? services.length : "—"} on the
+              {/* <span className="text-xs text-gray-400">
+                of {catalogStatus === "success" ? "" : "—"} on the
                 platform
-              </span>
+              </span> */}
               <a
                 href="/services"
                 className="text-xs font-semibold text-orange-500 hover:text-orange-600"
@@ -224,11 +224,19 @@ export default function VendorDashboard() {
         </div>
 
         <footer className="mt-8 pt-6 border-t border-gray-200 flex items-center justify-between text-xs text-gray-400">
-          <p>Sky Bank Sierra Leone Limited · Authorized by Bank of Sierra Leone</p>
+          <p>
+            Sky Bank Sierra Leone Limited · Authorized by Bank of Sierra Leone
+          </p>
           <div className="flex items-center gap-6">
-            <Link to="/api-docs" className="hover:text-gray-600">API Documentation</Link>
-            <a href="#" className="hover:text-gray-600">Developer Sandbox</a>
-            <a href="#" className="hover:text-gray-600">Security & Compliance</a>
+            <Link to="/api-docs" className="hover:text-gray-600">
+              API Documentation
+            </Link>
+            <a href="#" className="hover:text-gray-600">
+              Developer Sandbox
+            </a>
+            <a href="#" className="hover:text-gray-600">
+              Security & Compliance
+            </a>
           </div>
         </footer>
       </div>

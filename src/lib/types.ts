@@ -98,6 +98,8 @@ export interface UpdateUserRequest {
 
 export interface UserRolesRequest {
   roles: string[];
+  /** Mandatory justification - role changes travel through the maker-checker. */
+  comment: string;
 }
 
 /** One recorded call this service made to a downstream system. */
@@ -155,4 +157,114 @@ export interface PageResponse<T> {
   first: boolean;
   last: boolean;
   empty: boolean;
+}
+
+/* ============================================================
+ * Governance (maker-checker) types
+ * ============================================================ */
+
+export type AdminGovernanceRole =
+  | "SUPER_ADMIN"
+  | "CONTROL"
+  | "INITIATOR"
+  | "AUTHORIZER";
+
+/** The signed-in administrator as `GET /api/admin/me` reports it. */
+export interface AdminMe {
+  keycloakUserId: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  adminRole: AdminGovernanceRole | null;
+  mustChangePassword: boolean;
+  permissions: string[];
+}
+
+/** One bank staff administrator as the user-management screen lists them. */
+export interface AdminUserSummary {
+  keycloakUserId: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  adminRole: AdminGovernanceRole | null;
+  enabled: boolean;
+  mustChangePassword: boolean;
+  /** True when an approved suspension blocks this account. */
+  suspended: boolean;
+  /** ISO timestamp until which an approved time-lock holds; null when unlocked. */
+  lockedUntil: string | null;
+  lastLogin: string | null;
+  createdAt: string | null;
+}
+
+export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export type ApprovalActionType =
+  | "VENDOR_REGISTRATION"
+  | "ADMIN_USER_CREATE"
+  | "SERVICE_ASSIGNMENT"
+  | "CLIENT_SUSPEND"
+  | "CLIENT_ACTIVATE"
+  | "ADMIN_ROLE_ASSIGN"
+  | "USER_SUSPEND"
+  | "USER_UNSUSPEND"
+  | "USER_LOCK";
+
+/** One maker-checker request in the approvals queue. */
+export interface ApprovalRequest {
+  id: string;
+  actionType: ApprovalActionType;
+  actionLabel: string;
+  commentRequired: boolean;
+  targetLabel: string;
+  targetId: string | null;
+  status: ApprovalStatus;
+  payload: Record<string, unknown>;
+  initiatedByKeycloakUserId: string;
+  initiatedByName: string;
+  initiatedByEmail: string;
+  initiatedByRole: string;
+  initiatedComment: string | null;
+  authorizedByKeycloakUserId: string | null;
+  authorizedByName: string | null;
+  authorizedByRole: string | null;
+  authorizationComment: string | null;
+  authorizedAt: string | null;
+  createdAt: string;
+}
+
+/** One entry of the governance audit trail. */
+export interface GovernanceAuditEntry {
+  id: string;
+  actionType: string;
+  outcome: "INITIATED" | "APPROVED" | "REJECTED";
+  summary: string;
+  detail: string | null;
+  targetLabel: string | null;
+  actorName: string | null;
+  actorEmail: string | null;
+  actorRole: string | null;
+  comment: string | null;
+  createdAt: string;
+}
+
+/** Static description of a governance role and what it may do. */
+export interface GovernanceRoleDescription {
+  role: AdminGovernanceRole;
+  label: string;
+  description: string;
+  permissions: string[];
+}
+
+/** One entry of the bank staff directory behind the searchable dropdown. */
+export interface StaffMember {
+  id: string;
+  staffId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  department: string;
+  title: string;
 }
