@@ -28,9 +28,14 @@ export default function UserApprovalsPage() {
   const me = (claims?.email ?? claims?.preferred_username ?? "").toLowerCase();
 
   const [requests, setRequests] = useState<UserCreationRequestResponse[]>([]);
+  const [filter, setFilter] = useState<"PENDING" | "ALL">("PENDING");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const visible =
+    filter === "PENDING" ? requests.filter((r) => r.status === "PENDING") : requests;
+  const pendingCount = requests.filter((r) => r.status === "PENDING").length;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,6 +86,24 @@ export default function UserApprovalsPage() {
           </div>
         )}
 
+        <div className="mb-4 flex gap-2">
+          {(["PENDING", "ALL"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setFilter(value)}
+              aria-pressed={filter === value}
+              className={`rounded-full px-4 py-1.5 text-xs font-semibold ${
+                filter === value
+                  ? "bg-gray-900 text-white"
+                  : "bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {value === "PENDING" ? `Pending (${pendingCount})` : "All requests"}
+            </button>
+          ))}
+        </div>
+
         <div className="bg-white rounded-2xl shadow-sm overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs uppercase text-gray-500">
@@ -100,14 +123,14 @@ export default function UserApprovalsPage() {
                   </td>
                 </tr>
               )}
-              {!loading && requests.length === 0 && (
+              {!loading && visible.length === 0 && (
                 <tr>
                   <td className="p-4 text-gray-500" colSpan={5}>
-                    No requests yet.
+                    {filter === "PENDING" ? "No requests awaiting approval." : "No requests yet."}
                   </td>
                 </tr>
               )}
-              {requests.map((r) => (
+              {visible.map((r) => (
                 <tr key={r.id} className="border-t border-gray-100">
                   <td className="p-4">
                     <p className="font-medium text-gray-900">

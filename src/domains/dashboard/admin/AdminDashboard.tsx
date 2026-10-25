@@ -4,6 +4,7 @@ import TotalCompaniesCard from "../components/TotalCompaniesCard";
 import PendingApprovalsCard from "../components/PendingApprovalsCard";
 import RecentRegistrationsCard from "../components/RecentRegistrationsCard";
 import OverviewChart from "../components/OverviewChart";
+import PendingUserRequestsCard from "../components/PendingUserRequestsCard";
 import ActiveCompaniesCard from "../components/ActiveCompaniesCard";
 import { useClients } from "../../../lib/useClients";
 import { getDisplayName } from "../../../lib/user";
@@ -34,6 +35,8 @@ export default function AdminDashboard() {
           <TotalCompaniesCard count={total} />
           <OverviewChart />
         </div>
+
+        <PendingUserRequestsCard />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <PendingApprovalsCard />

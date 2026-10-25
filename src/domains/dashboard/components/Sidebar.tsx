@@ -44,7 +44,7 @@ export default function Sidebar() {
           ...((roles.includes("ROLE_AUTHORISE_USER_CREATION") ||
             roles.includes("ROLE_AUTHORISE_REGISTRATION") ||
             roles.includes("ROLE_CREATE_USER") ||
-            roles.includes("ROLE_REGISTER_USER"))
+            roles.includes("ROLE_REGISTER_VENDOR"))
             ? [
                 {
                   name: "User Approvals",

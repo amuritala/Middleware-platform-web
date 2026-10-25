@@ -118,7 +118,7 @@ export const adminApi = {
   getRoles: () => request<string[]>("/admin/roles"),
 
   /**
-   * Queue a vendor registration for approval (needs ROLE_REGISTER_USER). The password is a
+   * Queue a vendor registration for approval (needs ROLE_REGISTER_VENDOR). The password is a
    * generated temporary one; the vendor must replace it at first sign-in.
    */
   requestClient: (body: CreateClientRequest) =>

@@ -1,4 +1,7 @@
-import { useState } from "react";
+import UserRequestDecisionModal from "./UserRequestDecisionModal";
+import { useEffect, useState } from "react";
+import { adminApi } from "../../../lib/api";
+import type { UserCreationRequestResponse } from "../../../lib/types";
 import { usePendingClients } from "../../../lib/useClients";
 import ClientDetailModal from "./ClientDetailModal";
 
@@ -30,6 +33,15 @@ function formatTime(dateStr: string) {
 export default function RecentRegistrationsCard() {
   const { clients, status, error, approve, reject } = usePendingClients();
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<UserCreationRequestResponse | null>(null);
+  const [queued, setQueued] = useState<UserCreationRequestResponse[]>([]);
+
+  useEffect(() => {
+    adminApi
+      .getUserCreationRequests("PENDING")
+      .then((all) => setQueued(all.filter((r) => r.kind === "CLIENT")))
+      .catch(() => setQueued([]));
+  }, []);
 
   const handleApprove = async (clientId: string, roles: string[] = []) => {
     try {
@@ -72,11 +84,11 @@ export default function RecentRegistrationsCard() {
                 Recent Registrations Awaiting Approval
               </h3>
               <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
-                {clients.length} New Requests
+                {clients.length + queued.length} New Requests
               </span>
             </div>
             <p className="text-xs text-gray-400">
-              {clients.length} pending company verification reviews
+              {clients.length + queued.length} pending company verification reviews
             </p>
           </div>
         </div>
@@ -94,7 +106,7 @@ export default function RecentRegistrationsCard() {
         </div>
       )}
 
-      {status === "success" && clients.length === 0 && (
+      {status === "success" && clients.length === 0 && queued.length === 0 && (
         <div className="py-8 text-center text-sm text-gray-400">
           No pending registrations
         </div>
@@ -184,6 +196,37 @@ export default function RecentRegistrationsCard() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {queued.length > 0 && (
+        <div className="mt-6 border-t border-gray-100 pt-4">
+          <p className="mb-2 text-xs font-semibold text-gray-500">
+            Submitted by staff, awaiting authorisation
+          </p>
+          {queued.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => setSelectedRequest(r)}
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-gray-50"
+            >
+              <span className="text-sm text-gray-900">
+                {r.companyName || r.email}
+                <span className="ml-2 text-xs text-gray-400">
+                  {r.firstName} {r.lastName} · requested by {r.requestedBy}
+                </span>
+              </span>
+              <span className="text-xs font-medium text-orange-600">Review</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {selectedRequest && (
+        <UserRequestDecisionModal
+          request={selectedRequest}
+          onClose={() => setSelectedRequest(null)}
+          onDecided={(id) => setQueued((q) => q.filter((x) => x.id !== id))}
+        />
       )}
 
       {selectedClientId && (

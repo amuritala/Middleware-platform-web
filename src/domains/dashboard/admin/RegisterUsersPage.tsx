@@ -47,13 +47,13 @@ function BankUserForm({ onCreated }: { onCreated: () => void }) {
       if (prev.includes(role)) return prev.filter((r) => r !== role);
       // Requesters and their authorisers are mutually exclusive, so picking one drops the other.
       const conflicts: Record<string, string[]> = {
-        ROLE_AUTHORISE_USER_CREATION: ["ROLE_CREATE_USER", "ROLE_REGISTER_USER"],
+        ROLE_AUTHORISE_USER_CREATION: ["ROLE_CREATE_USER", "ROLE_REGISTER_VENDOR"],
         ROLE_CREATE_USER: ["ROLE_AUTHORISE_USER_CREATION"],
-        ROLE_REGISTER_USER: [
+        ROLE_REGISTER_VENDOR: [
           "ROLE_AUTHORISE_USER_CREATION",
           "ROLE_AUTHORISE_REGISTRATION",
         ],
-        ROLE_AUTHORISE_REGISTRATION: ["ROLE_REGISTER_USER"],
+        ROLE_AUTHORISE_REGISTRATION: ["ROLE_REGISTER_VENDOR"],
       };
       const kept = prev.filter((r) => !(conflicts[role] ?? []).includes(r));
       return [...kept, role];
@@ -165,9 +165,9 @@ function BankUserForm({ onCreated }: { onCreated: () => void }) {
           </div>
           <p className="mt-2 text-xs text-gray-500">
             ROLE_AUTHORISE_USER_CREATION cannot be combined with
-            ROLE_CREATE_USER or ROLE_REGISTER_USER, and
+            ROLE_CREATE_USER or ROLE_REGISTER_VENDOR, and
             ROLE_AUTHORISE_REGISTRATION cannot be combined with
-            ROLE_REGISTER_USER.
+            ROLE_REGISTER_VENDOR.
           </p>
         </fieldset>
       )}
@@ -198,7 +198,7 @@ export default function RegisterUsersPage() {
   const { claims } = useAuth();
   const roles = claims?.realm_access?.roles ?? [];
   const canRequestBankUser = roles.includes("ROLE_CREATE_USER");
-  const canRegisterClient = roles.includes("ROLE_REGISTER_USER");
+  const canRegisterClient = roles.includes("ROLE_REGISTER_VENDOR");
   const [chosen, setKind] = useState<UserKind | null>(null);
   const kind: UserKind | null =
     chosen === "CLIENT" && canRegisterClient
@@ -257,7 +257,7 @@ export default function RegisterUsersPage() {
         <div className="bg-white rounded-2xl p-8 shadow-sm max-w-3xl">
           {kind === null ? (
             <p className="text-sm text-gray-600">
-              You need ROLE_REGISTER_USER or ROLE_CREATE_USER to register users.
+              You need ROLE_REGISTER_VENDOR or ROLE_CREATE_USER to register users.
             </p>
           ) : kind === "CLIENT" ? (
             <RegisterForm
