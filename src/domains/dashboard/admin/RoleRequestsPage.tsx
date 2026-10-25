@@ -25,6 +25,15 @@ export default function RoleRequestsPage() {
   const [flash, setFlash] = useState<Flash | null>(null);
   const [page, setPage] = useState(1);
   const [prevCount, setPrevCount] = useState(-1);
+  // Per-application role decisions queued by the authoriser before submitting.
+  const [queue, setQueue] = useState<
+    Record<string, { approve: string[]; reject: string[] }>
+  >({});
+  const [pending, setPending] = useState<{
+    appId: string;
+    role: string;
+    action: "approve" | "reject";
+  } | null>(null);
 
   // Deleting rows (approve/reject) can move the last page out from under us.
   const totalPages = Math.max(1, Math.ceil(applications.length / PAGE_SIZE));
@@ -61,11 +70,15 @@ export default function RoleRequestsPage() {
   const decide = async (
     application: RoleChangeApplicationResponse,
     action: "approve" | "reject",
+    rejectedRoles: string[] = queue[application.id]?.reject ?? [],
   ) => {
     setBusyId(application.id);
     try {
       if (action === "approve") {
-        await adminApi.approveRoleApplication(application.id);
+        await adminApi.approveRoleApplication(
+          application.id,
+          rejectedRoles,
+        );
       } else {
         await adminApi.rejectRoleApplication(application.id);
       }
@@ -89,6 +102,27 @@ export default function RoleRequestsPage() {
       });
     } finally {
       setBusyId(null);
+    }
+  };
+
+  /** Queues the confirmed decision; once every role is treated the request is submitted and removed. */
+  const confirmRoleDecision = () => {
+    if (!pending) return;
+    const app = applications.find((a) => a.id === pending.appId);
+    const entry = queue[pending.appId] ?? { approve: [], reject: [] };
+    const next = {
+      ...entry,
+      [pending.action]: [...entry[pending.action], pending.role],
+    };
+    setQueue((prev) => ({ ...prev, [pending.appId]: next }));
+    setPending(null);
+    if (!app) return;
+    const roles = app.newlyRequestedRoles?.length
+      ? app.newlyRequestedRoles
+      : app.requestedRoles;
+    const treated = new Set([...next.approve, ...next.reject]);
+    if (roles.every((r) => treated.has(r))) {
+      void decide(app, next.approve.length > 0 ? "approve" : "reject", next.reject);
     }
   };
 
@@ -321,16 +355,66 @@ export default function RoleRequestsPage() {
                             {(app.newlyRequestedRoles?.length
                               ? app.newlyRequestedRoles
                               : app.requestedRoles
-                            ).map((role) => (
-                              <span
-                                key={role}
-                                title={describeRoleName(role).description}
-                                className="px-2 py-0.5 bg-white border border-orange-200 rounded-lg text-[12.5px] font-mono text-orange-700 font-bold"
-                              >
-                                {describeRoleName(role).displayName}
-                              </span>
-                            ))}
+                            )
+                              .filter(
+                                (role) =>
+                                  !queue[app.id]?.approve.includes(role) &&
+                                  !queue[app.id]?.reject.includes(role),
+                              )
+                              .map((role) => (
+                                <span
+                                  key={role}
+                                  title={describeRoleName(role).description}
+                                  className="relative pl-2 pr-12 py-1 bg-white border border-orange-200 rounded-lg text-[12.5px] font-mono text-orange-700 font-bold"
+                                >
+                                  {describeRoleName(role).displayName}
+                                  <span className="absolute top-0 right-0 flex">
+                                    <button
+                                      type="button"
+                                      aria-label={`Remove ${role}`}
+                                      onClick={() =>
+                                        setPending({ appId: app.id, role, action: "reject" })
+                                      }
+                                      className="w-5 h-5 text-sm leading-none text-red-600 hover:bg-red-50 rounded-bl-md"
+                                    >
+                                      −
+                                    </button>
+                                    <button
+                                      type="button"
+                                      aria-label={`Add ${role}`}
+                                      onClick={() =>
+                                        setPending({ appId: app.id, role, action: "approve" })
+                                      }
+                                      className="w-5 h-5 text-sm leading-none text-emerald-600 hover:bg-emerald-50 rounded-tr-md"
+                                    >
+                                      +
+                                    </button>
+                                  </span>
+                                </span>
+                              ))}
                           </div>
+                          {queue[app.id] &&
+                            (queue[app.id].approve.length > 0 ||
+                              queue[app.id].reject.length > 0) && (
+                              <p className="mt-1.5 text-[11px] text-gray-500">
+                                {queue[app.id].approve.length > 0 && (
+                                  <span className="mr-3 text-emerald-600">
+                                    Queued to add:{" "}
+                                    {queue[app.id].approve
+                                      .map((r) => describeRoleName(r).displayName)
+                                      .join(", ")}
+                                  </span>
+                                )}
+                                {queue[app.id].reject.length > 0 && (
+                                  <span className="text-red-600">
+                                    Queued to remove:{" "}
+                                    {queue[app.id].reject
+                                      .map((r) => describeRoleName(r).displayName)
+                                      .join(", ")}
+                                  </span>
+                                )}
+                              </p>
+                            )}
                         </td>
                         <td className="hidden lg:table-cell px-3 py-3.5">
                           <span className="text-xs text-gray-400">
@@ -470,6 +554,48 @@ export default function RoleRequestsPage() {
           )}
         </div>
       </div>
+      {pending && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setPending(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-gray-900">
+              {pending.action === "approve" ? "Add role?" : "Remove role?"}
+            </h3>
+            <p className="mt-2 text-sm text-gray-600">
+              Do you want to {pending.action === "approve" ? "add" : "remove"}{" "}
+              <span className="font-semibold">
+                {describeRoleName(pending.role).displayName}
+              </span>
+              {pending.action === "approve"
+                ? " to this approval?"
+                : " from this request? It will not be granted."}
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setPending(null)}
+                className="rounded-lg px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRoleDecision}
+                className={`rounded-lg px-4 py-2 text-xs font-medium text-white ${
+                  pending.action === "approve"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
+              >
+                {pending.action === "approve" ? "Add" : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

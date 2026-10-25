@@ -213,10 +213,10 @@ export const adminApi = {
       `/customer-management/role-applications/${applicationId}`
     ),
 
-  approveRoleApplication: (applicationId: string) =>
+  approveRoleApplication: (applicationId: string, rejectedRoles: string[] = []) =>
     request<RoleChangeApplicationResponse>(
       `/customer-management/role-applications/${applicationId}/approve`,
-      { method: "PUT" }
+      { method: "PUT", body: JSON.stringify({ rejectedRoles }) }
     ),
 
   rejectRoleApplication: (applicationId: string) =>
