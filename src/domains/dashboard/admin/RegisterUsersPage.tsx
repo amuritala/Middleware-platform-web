@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import TopNav from "../components/TopNav";
 import RegisterForm from "../../auth/components/RegisterForm";
 import { adminApi, ApiError } from "../../../lib/api";
+import { generatePassword } from "../../../lib/password";
+import { useAuth } from "../../../lib/useAuth";
 
 type UserKind = "CLIENT" | "BANK_USER";
 
@@ -21,12 +23,41 @@ function BankUserForm({ onCreated }: { onCreated: () => void }) {
     firstName: "",
     lastName: "",
     email: "",
-    password: "",
   });
-  const [showPassword, setShowPassword] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [rolesError, setRolesError] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    adminApi
+      .getBankUserRoles()
+      .then(setAvailableRoles)
+      .catch((err) =>
+        setRolesError(
+          err instanceof Error ? err.message : "Could not load roles",
+        ),
+      );
+  }, []);
+
+  const toggleRole = (role: string) =>
+    setRoles((prev) => {
+      if (prev.includes(role)) return prev.filter((r) => r !== role);
+      // Requesters and their authorisers are mutually exclusive, so picking one drops the other.
+      const conflicts: Record<string, string[]> = {
+        ROLE_AUTHORISE_USER_CREATION: ["ROLE_CREATE_USER", "ROLE_REGISTER_USER"],
+        ROLE_CREATE_USER: ["ROLE_AUTHORISE_USER_CREATION"],
+        ROLE_REGISTER_USER: [
+          "ROLE_AUTHORISE_USER_CREATION",
+          "ROLE_AUTHORISE_REGISTRATION",
+        ],
+        ROLE_AUTHORISE_REGISTRATION: ["ROLE_REGISTER_USER"],
+      };
+      const kept = prev.filter((r) => !(conflicts[role] ?? []).includes(r));
+      return [...kept, role];
+    });
 
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -41,21 +72,17 @@ function BankUserForm({ onCreated }: { onCreated: () => void }) {
       setError("Enter a valid email address.");
       return;
     }
-    if (form.password.length < 8) {
-      setError("Use a temporary password of at least 8 characters.");
-      return;
-    }
-
     setSubmitting(true);
     try {
-      await adminApi.createBankUser({
+      await adminApi.requestBankUser({
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.trim(),
-        password: form.password,
+        password: generatePassword(),
+        roles,
       });
       setSuccess(
-        "Bank user created with ROLE_ADMIN. They must replace the temporary password at first sign-in.",
+        "Request submitted. The user is created once an authoriser approves it.",
       );
       setTimeout(onCreated, 2000);
     } catch (err) {
@@ -110,27 +137,44 @@ function BankUserForm({ onCreated }: { onCreated: () => void }) {
         value={form.email}
         onChange={(e) => set("email")(e.target.value)}
       />
-      <div className="relative">
-        <input
-          className={`${inputClass} pr-16`}
-          type={showPassword ? "text" : "password"}
-          placeholder="Temporary password"
-          autoComplete="new-password"
-          value={form.password}
-          onChange={(e) => set("password")(e.target.value)}
-        />
-        <button
-          type="button"
-          onClick={() => setShowPassword((v) => !v)}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-500 hover:text-gray-800"
-        >
-          {showPassword ? "Hide" : "Show"}
-        </button>
-      </div>
+      {rolesError && (
+        <p className="text-xs text-red-600">
+          Could not load assignable roles: {rolesError}. Make sure the API has
+          been restarted with the latest build.
+        </p>
+      )}
+      {availableRoles.length > 0 && (
+        <fieldset>
+          <legend className="mb-2 text-xs font-medium text-gray-700">
+            Additional roles
+          </legend>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {availableRoles.map((role) => (
+              <label
+                key={role}
+                className="flex items-center gap-2 text-xs text-gray-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={roles.includes(role)}
+                  onChange={() => toggleRole(role)}
+                />
+                <span className="font-mono">{role}</span>
+              </label>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            ROLE_AUTHORISE_USER_CREATION cannot be combined with
+            ROLE_CREATE_USER or ROLE_REGISTER_USER, and
+            ROLE_AUTHORISE_REGISTRATION cannot be combined with
+            ROLE_REGISTER_USER.
+          </p>
+        </fieldset>
+      )}
 
       <p className="text-xs text-gray-500">
         Role: <span className="font-mono">ROLE_ADMIN</span> (assigned
-        automatically)
+        automatically). A temporary password is generated and emailed on approval.
       </p>
 
       <button
@@ -138,7 +182,7 @@ function BankUserForm({ onCreated }: { onCreated: () => void }) {
         disabled={submitting || !!success}
         className="rounded-full bg-gray-900 px-6 py-3 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-60"
       >
-        {submitting ? "Creating…" : "Create bank user"}
+        {submitting ? "Submitting…" : "Request bank user"}
       </button>
     </form>
   );
@@ -151,7 +195,21 @@ function BankUserForm({ onCreated }: { onCreated: () => void }) {
  */
 export default function RegisterUsersPage() {
   const navigate = useNavigate();
-  const [kind, setKind] = useState<UserKind>("CLIENT");
+  const { claims } = useAuth();
+  const roles = claims?.realm_access?.roles ?? [];
+  const canRequestBankUser = roles.includes("ROLE_CREATE_USER");
+  const canRegisterClient = roles.includes("ROLE_REGISTER_USER");
+  const [chosen, setKind] = useState<UserKind | null>(null);
+  const kind: UserKind | null =
+    chosen === "CLIENT" && canRegisterClient
+      ? "CLIENT"
+      : chosen === "BANK_USER" && canRequestBankUser
+        ? "BANK_USER"
+        : canRegisterClient
+          ? "CLIENT"
+          : canRequestBankUser
+            ? "BANK_USER"
+            : null;
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -163,19 +221,22 @@ export default function RegisterUsersPage() {
         <div className="mb-6 mt-20">
           <h1 className="text-3xl font-bold text-gray-900">Register Users</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Create a client (vendor company) or a bank user (staff administrator).
-            Both sign in with the temporary password you set and must change it at
-            first sign-in
+            Request a client (vendor company) or a bank user (staff administrator).
+            Every request must be approved by an authoriser. New users receive a temporary password and must change it at first sign-in
           </p>
         </div>
 
         <div className="mb-4 grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
           {(
             [
-              ["CLIENT", "Client", "A vendor company that consumes banking services (ROLE_CLIENT)"],
-              ["BANK_USER", "Bank User", "A bank staff administrator (ROLE_ADMIN)"],
+              ["CLIENT", "Client", "A vendor company that consumes banking services (ROLE_CLIENT), approved by an authoriser"],
+              ["BANK_USER", "Bank User", "A bank staff administrator (ROLE_ADMIN), approved by an authoriser"],
             ] as const
-          ).map(([value, label, hint]) => (
+          )
+            .filter(([value]) =>
+              value === "CLIENT" ? canRegisterClient : canRequestBankUser,
+            )
+            .map(([value, label, hint]) => (
             <button
               key={value}
               type="button"
@@ -194,10 +255,14 @@ export default function RegisterUsersPage() {
         </div>
 
         <div className="bg-white rounded-2xl p-8 shadow-sm max-w-3xl">
-          {kind === "CLIENT" ? (
+          {kind === null ? (
+            <p className="text-sm text-gray-600">
+              You need ROLE_REGISTER_USER or ROLE_CREATE_USER to register users.
+            </p>
+          ) : kind === "CLIENT" ? (
             <RegisterForm
               onBackHome={() => navigate("/admin-dashboard")}
-              onRegistered={() => navigate("/admin/clients")}
+              onRegistered={() => navigate("/admin/user-approvals")}
               showLoginLink={false}
               variant="admin"
             />
@@ -206,7 +271,7 @@ export default function RegisterUsersPage() {
               <h2 className="mb-4 text-lg font-semibold text-gray-900">
                 New bank user
               </h2>
-              <BankUserForm onCreated={() => navigate("/admin/users")} />
+              <BankUserForm onCreated={() => navigate("/admin/user-approvals")} />
             </>
           )}
         </div>

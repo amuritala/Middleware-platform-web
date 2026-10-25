@@ -77,13 +77,33 @@ export interface AdminUserResponse {
 
 export type UserType = "BANK_USER" | "CLIENT";
 
-/** Payload for `POST /api/admin/users` - creates a bank user with ROLE_ADMIN. */
+/** Payload for `POST /api/admin/user-requests` - queues a bank user (ROLE_ADMIN) for approval. */
 export interface CreateBankUserRequest {
   email: string;
   firstName: string;
   lastName: string;
   /** Temporary credential - replaced at first sign-in. */
   password: string;
+  /** Extra realm roles granted on approval (ROLE_ADMIN is implicit). */
+  roles?: string[];
+}
+
+export type UserCreationRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+/** A queued bank-user creation request. The temporary password is never returned. */
+export interface UserCreationRequestResponse {
+  id: string;
+  kind: "BANK_USER" | "CLIENT";
+  roles: string[];
+  companyName: string | null;
+  email: string;
+  firstName: string;
+  lastName: string;
+  status: UserCreationRequestStatus;
+  requestedBy: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
 }
 
 /** Mutable user attributes. Omitted fields are left unchanged. */

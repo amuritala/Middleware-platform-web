@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { adminApi, publicApi, ApiError } from "../../../lib/api";
+import { generatePassword } from "../../../lib/password";
 import { API_BASE_URL } from "../../../lib/apiBaseUrl";
 
 /* ------------------------------------------------------------------ */
@@ -184,7 +185,7 @@ function validateStep1(f: Step1) {
   return errors;
 }
 
-function validateStep2(f: Step2) {
+function validateStep2(f: Step2, requirePassword = true) {
   const errors: Partial<Record<keyof Step2, string>> = {};
   if (!f.firstName.trim()) errors.firstName = "First name is required.";
   if (!f.lastName.trim()) errors.lastName = "Last name is required.";
@@ -192,6 +193,7 @@ function validateStep2(f: Step2) {
     errors.contactEmail = "Contact email is required.";
   else if (!EMAIL_RE.test(f.contactEmail))
     errors.contactEmail = "Enter a valid email address.";
+  if (!requirePassword) return errors;
   if (!f.password) errors.password = "Password is required.";
   else if (f.password.length < 8)
     errors.password = "Use at least 8 characters.";
@@ -315,7 +317,7 @@ export default function RegisterForm({
   };
 
   const submit = async () => {
-    const errs = validateStep2(step2);
+    const errs = validateStep2(step2, variant !== "admin");
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
@@ -336,9 +338,9 @@ export default function RegisterForm({
 
     try {
       if (variant === "admin") {
-        // Admin-only endpoint: the vendor is created ACTIVE with ROLE_CLIENT and the
-        // temporary password the admin typed - no approval queue.
-        await adminApi.createClient({
+        // Queued for an authoriser; the vendor is created ACTIVE on approval with a
+        // generated temporary password.
+        await adminApi.requestClient({
           companyName: step1.companyName,
           registrationNumber: step1.registrationNumber,
           contactFirstName: step2.firstName,
@@ -350,10 +352,10 @@ export default function RegisterForm({
           taxId: step1.taxId,
           industry: step1.industry,
           country: "",
-          password: step2.password,
+          password: generatePassword(),
         });
         setApiSuccess(
-          "Vendor account created and activated. It must replace the temporary password at first sign-in."
+          "Registration submitted. The vendor is created once an authoriser approves it."
         );
         setTimeout(() => {
           if (onRegistered) onRegistered();
@@ -722,6 +724,7 @@ export default function RegisterForm({
                     </div>
                   </div>
 
+                  {variant !== "admin" && (<>
                   <h3 className="mt-8 text-[15px] font-semibold text-gray-900">
                     Security
                   </h3>
@@ -763,6 +766,7 @@ export default function RegisterForm({
                       <FieldError message={errors.confirmPassword} />
                     </div>
                   </div>
+                  </>)}
                 </>
               )}
             </div>

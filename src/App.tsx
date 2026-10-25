@@ -11,6 +11,7 @@ import ApiExplorerPage from './domains/dashboard/components/ApiExplorerPage';
 import ClientsPage from './domains/dashboard/admin/ClientsPage';
 import RegisterUsersPage from './domains/dashboard/admin/RegisterUsersPage';
 import UsersPage from './domains/dashboard/admin/UsersPage';
+import UserApprovalsPage from './domains/dashboard/admin/UserApprovalsPage';
 import RoleRequestsPage from './domains/dashboard/admin/RoleRequestsPage';
 import AuditPage from './domains/dashboard/admin/AuditPage';
 import SettingsPage from './domains/dashboard/admin/SettingsPage';
@@ -155,6 +156,14 @@ function App() {
                 element={
                     <ProtectedRoute requiredRole="admin" userRole={userRole}>
                         <ClientsPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/admin/user-approvals"
+                element={
+                    <ProtectedRoute requiredRole="admin" userRole={userRole}>
+                        <UserApprovalsPage />
                     </ProtectedRoute>
                 }
             />

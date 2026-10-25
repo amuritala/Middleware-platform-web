@@ -14,6 +14,8 @@ import type {
   CredentialsResponse,
   CreateClientRequest,
   CreateBankUserRequest,
+  UserCreationRequestResponse,
+  UserCreationRequestStatus,
 } from "./types";
 
 export type {
@@ -116,21 +118,40 @@ export const adminApi = {
   getRoles: () => request<string[]>("/admin/roles"),
 
   /**
-   * Create a vendor that goes live immediately - admin-created accounts never enter the
-   * pending queue. The supplied password is temporary: the vendor is forced to replace it
-   * at first sign-in.
+   * Queue a vendor registration for approval (needs ROLE_REGISTER_USER). The password is a
+   * generated temporary one; the vendor must replace it at first sign-in.
    */
-  createClient: (body: CreateClientRequest) =>
-    request<ClientResponse>("/admin/clients", {
+  requestClient: (body: CreateClientRequest) =>
+    request<UserCreationRequestResponse>("/admin/user-requests/clients", {
       method: "POST",
       body: JSON.stringify(body),
     }),
 
-  /** Create a bank user (ROLE_ADMIN) with a temporary password emailed to them. */
-  createBankUser: (body: CreateBankUserRequest) =>
-    request<AdminUserResponse>("/admin/users", {
+  /** Queue a bank user (ROLE_ADMIN) for approval. Needs ROLE_CREATE_USER. */
+  requestBankUser: (body: CreateBankUserRequest) =>
+    request<UserCreationRequestResponse>("/admin/user-requests", {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+
+  /** Roles that can be given to a new bank user. */
+  getBankUserRoles: () => request<string[]>("/admin/bank-user-roles"),
+
+  /** Creation requests, optionally only one status. */
+  getUserCreationRequests: (status?: UserCreationRequestStatus) =>
+    request<UserCreationRequestResponse[]>(
+      status ? `/admin/user-requests?status=${status}` : "/admin/user-requests",
+    ),
+
+  /** Approve a request, which creates the user. Needs ROLE_AUTHORISE_USER_CREATION (bank users) or ROLE_AUTHORISE_REGISTRATION (clients). */
+  approveUserCreation: (id: string) =>
+    request<UserCreationRequestResponse>(`/admin/user-requests/${id}/approve`, {
+      method: "PUT",
+    }),
+
+  rejectUserCreation: (id: string) =>
+    request<UserCreationRequestResponse>(`/admin/user-requests/${id}/reject`, {
+      method: "PUT",
     }),
 
   /* ---- Users ---- */
