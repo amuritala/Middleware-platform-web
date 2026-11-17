@@ -567,9 +567,7 @@ export const apiCatalog: ApiDefinition[] = [
         debit: "10",
         credit: "10",
         balancing: "Y",
-      },
-      misdetails: null,
-      txnudfdetails: [],
+      }
     },
     responseExample: fcubsResponse({ detbsJrnlTxnMasterIO: {} }),
     mutatesData: true,
@@ -651,9 +649,7 @@ export const apiCatalog: ApiDefinition[] = [
         debit: "10",
         credit: "10",
         balancing: "Y",
-      },
-      misdetails: null,
-      txnudfdetails: [],
+      }
     },
     responseExample: fcubsResponse({ detbsJrnlTxnMasterIO: {} }),
     mutatesData: true,

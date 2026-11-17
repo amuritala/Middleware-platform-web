@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 IMAGE_NAME="baking-web-service"
-VERSION="${WEB_TAG:-1.9}"
+VERSION="${WEB_TAG:-2.0}"
 REGISTRY="docker.io/techstackimagerepo"
 FULL_IMAGE_NAME="${REGISTRY}/${IMAGE_NAME}:${VERSION}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
