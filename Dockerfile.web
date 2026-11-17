@@ -1,0 +1,16 @@
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+ENV VITE_API_URL=/api \
+    VITE_AUTH_API_URL=/api \
+    VITE_API_SERVICE=/api
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=build /app/dist ./dist
+COPY server.mjs ./server.mjs
+EXPOSE 80
+CMD ["node", "server.mjs"]

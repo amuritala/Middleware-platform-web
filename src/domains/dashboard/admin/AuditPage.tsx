@@ -425,6 +425,7 @@ function formatDateTime(iso: string): string {
 
 /** The downstream service a call targeted, derived from the request payload. */
 function serviceOf(record: DownstreamAuditResponse): string {
+  if (/^(login|refresh|logout)$/i.test(record.operation ?? "")) return "Auth Service";
   return /customer/i.test(record.request)
     ? "Customer Service"
     : "Account Service";

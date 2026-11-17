@@ -11,7 +11,6 @@ import type {
   DownstreamAuditResponse,
   PageResponse,
   ChangePasswordRequest,
-  CredentialsResponse,
   CreateClientRequest,
   CreateBankUserRequest,
   AdminMe,
